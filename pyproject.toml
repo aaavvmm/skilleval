@@ -1,0 +1,16 @@
+[project]
+name = "skilleval"
+version = "0.1.0"
+description = "Agent Skill 消融评测框架 —— 量化每个 skill/MCP/规则对成功率与成本的边际贡献"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+report = ["matplotlib"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
