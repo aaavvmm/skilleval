@@ -22,11 +22,11 @@ Agent Skill 消融评测框架——量化"给 agent 加某个 skill/MCP/规则�
 | skill | 基线(适用) | 装备后(适用) | Δacc | 结论 |
 |---|---|---|---|---|
 | structured-extraction | 0% | **96%** | +96% | 有效增益 |
-| conflict-check | 46% | **98%** | +52% | 有效增益 |
-| fx-aware-sum | 58% | **98%** | +40% | 有效增益 |
-| format-spec | 48% | **96%** | +48% | 有效增益 |
-| priority-rules | 38% | **98%** | +60% | 有效增益 |
-| verbose-audit-log | 38% | 36% | -2% | **无显著收益, 纯增成本→建议移除** |
+| conflict-check | 48% | **100%** | +52% | 有效增益 |
+| fx-aware-sum | 52% | **98%** | +46% | 有效增益 |
+| format-spec | 48% | **100%** | +52% | 有效增益 |
+| priority-rules | 10% | **98%** | +88% | 有效增益 |
+| verbose-audit-log | 32% | 32% | 0% | **无显著收益, 纯增成本→建议移除** |
 
 ## 核心数字 B：真实 LLM 试点（claude -p / GLM, 110 调用 × 2 轮, $5.12）★更有料
 

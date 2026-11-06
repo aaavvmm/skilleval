@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 技能库(消融对象)
 ================
@@ -10,10 +9,11 @@
 verbose-audit-log 是刻意设计的"装饰性技能": 指令很长、无解法——
 用于演示框架识别"纯增成本的无用 skill"的能力(负结果也是结果)。
 """
+
 import re
 
-
 # ---------- 解法函数(确定性后端用; 先定义, SkillSpec 才能引用) ----------
+
 
 def _rx(text: str, pattern: str) -> str:
     m = re.search(pattern, text)
@@ -21,9 +21,11 @@ def _rx(text: str, pattern: str) -> str:
 
 
 def _solve_structured(t):
-    return {"date": _rx(t.prompt, r"关于(.{3,6})要签约"),
-            "amount": _rx(t.prompt, r"人民币(\d+)元"),
-            "contact": _rx(t.prompt, r"发件人: (.{2,5})")}
+    return {
+        "date": _rx(t.prompt, r"关于(.{3,6})要签约"),
+        "amount": _rx(t.prompt, r"人民币(\d+)元"),
+        "contact": _rx(t.prompt, r"发件人: (.{2,5})"),
+    }
 
 
 def _solve_schedule(t):
@@ -45,9 +47,13 @@ def _solve_format(t):
     lines = []
     for i, it in enumerate(items, 1):
         s = f"{i}. {it}"
-        lines.append(s if len(s) <= limit else f"{i}. {it[:limit - 3]}…")
-    return {"n_items": len(lines), "numbered": all(l[0].isdigit() for l in lines),
-            "max_len": limit, "lines": lines}
+        lines.append(s if len(s) <= limit else f"{i}. {it[: limit - 3]}…")
+    return {
+        "n_items": len(lines),
+        "numbered": all(ln[0].isdigit() for ln in lines),
+        "max_len": limit,
+        "lines": lines,
+    }
 
 
 def _solve_priority(t):
@@ -62,47 +68,73 @@ from .models import SkillSpec  # noqa: E402
 
 SKILL_STRUCTURED = SkillSpec(
     name="structured-extraction",
-    instruction=("结构化抽取: 从邮件/文档中抽取字段时, 只输出 JSON, "
-                 "键为 date/amount/contact, 不要输出任何解释文字。"),
+    instruction=(
+        "结构化抽取: 从邮件/文档中抽取字段时, 只输出 JSON, "
+        "键为 date/amount/contact, 不要输出任何解释文字。"
+    ),
     applies_to=("email_extract",),
-    solver=_solve_structured)
+    solver=_solve_structured,
+)
 
 SKILL_CONFLICT = SkillSpec(
     name="conflict-check",
-    instruction=("排程冲突检查: 安排会议前必须对照已有日程逐个时段检查, "
-                 "请求时段被占用时从可用时段池中选第一个空闲时段改期。"),
+    instruction=(
+        "排程冲突检查: 安排会议前必须对照已有日程逐个时段检查, "
+        "请求时段被占用时从可用时段池中选第一个空闲时段改期。"
+    ),
     applies_to=("schedule",),
-    solver=_solve_schedule)
+    solver=_solve_schedule,
+)
 
 SKILL_FX = SkillSpec(
     name="fx-aware-sum",
-    instruction=("多币种金额处理: 凡遇外币金额必须按给定汇率换算成人民币; "
-                 "服务类费用按公司规定加计6%税额后再汇总。"),
+    instruction=(
+        "多币种金额处理: 凡遇外币金额必须按给定汇率换算成人民币; "
+        "服务类费用按公司规定加计6%税额后再汇总。"
+    ),
     applies_to=("expense",),
-    solver=_solve_expense)
+    solver=_solve_expense,
+)
 
 SKILL_FORMAT = SkillSpec(
     name="format-spec",
-    instruction=("格式化输出规范: 列表必须逐条编号(1. 2. ...), "
-                 "每条严格不超过指定字数, 超长先精简再输出。"),
+    instruction=(
+        "格式化输出规范: 列表必须逐条编号(1. 2. ...), 每条严格不超过指定字数, 超长先精简再输出。"
+    ),
     applies_to=("doc_format",),
-    solver=_solve_format)
+    solver=_solve_format,
+)
 
 SKILL_PRIORITY = SkillSpec(
     name="priority-rules",
-    instruction=("优先级排序规则: 先按发件人级别降序(CEO/客户=3 > 直属上级=2 "
-                 "> 平级=1 > 外包=0), 同级按剩余时限升序。忽略收件顺序。"),
+    instruction=(
+        "优先级排序规则: 先按发件人级别降序(CEO/客户=3 > 直属上级=2 "
+        "> 平级=1 > 外包=0), 同级按剩余时限升序。忽略收件顺序。"
+    ),
     applies_to=("priority",),
-    solver=_solve_priority)
+    solver=_solve_priority,
+)
 
 SKILL_VERBOSE = SkillSpec(
     name="verbose-audit-log",
-    instruction=("审计日志规范: 每次处理任务前, 在内部思考中完整复述任务的全部"
-                 "输入字段并逐字确认, 记录数据来源、处理时间戳与置信度评估, "
-                 "对每个字段执行三遍一致性校验并在日志中保留全部中间版本, "
-                 "以确保全链路可追溯。此规范适用于所有任务类型, 不得省略。"),
+    instruction=(
+        "审计日志规范: 每次处理任务前, 在内部思考中完整复述任务的全部"
+        "输入字段并逐字确认, 记录数据来源、处理时间戳与置信度评估, "
+        "对每个字段执行三遍一致性校验并在日志中保留全部中间版本, "
+        "以确保全链路可追溯。此规范适用于所有任务类型, 不得省略。"
+    ),
     applies_to=("email_extract", "schedule", "expense", "doc_format", "priority"),
-    solver=None)          # 装饰性技能: 无实际作用, 只增加提示长度
+    solver=None,
+)  # 装饰性技能: 无实际作用, 只增加提示长度
 
-ALL_SKILLS = {s.name: s for s in (SKILL_STRUCTURED, SKILL_CONFLICT, SKILL_FX,
-                                  SKILL_FORMAT, SKILL_PRIORITY, SKILL_VERBOSE)}
+ALL_SKILLS = {
+    s.name: s
+    for s in (
+        SKILL_STRUCTURED,
+        SKILL_CONFLICT,
+        SKILL_FX,
+        SKILL_FORMAT,
+        SKILL_PRIORITY,
+        SKILL_VERBOSE,
+    )
+}

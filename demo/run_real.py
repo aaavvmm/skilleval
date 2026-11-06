@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 真实 LLM 后端消融试点(claude -p headless)
 ==========================================
@@ -10,6 +9,7 @@
   = 120 次调用, 3 并发 ≈ 15 分钟
 判分用 grade_tolerant(形式宽容、对错严格)。每 10 次写检查点, 可断点续跑。
 """
+
 import io
 import json
 import os
@@ -61,7 +61,7 @@ def skills_for(config: str):
         return []
     if config == "all-skills":
         return [s for s in ALL_SKILLS.values() if s.solver]
-    return [ALL_SKILLS[config[1:]]]          # "+skill-name"
+    return [ALL_SKILLS[config[1:]]]  # "+skill-name"
 
 
 def main():
@@ -69,11 +69,10 @@ def main():
     backend = ClaudeCodeBackend()
     configs = build_configs(tasks)
     runs = load_ckpt()
-    todo = [(c, t) for c, ts in configs.items() for t in ts
-            if t.task_id not in runs.get(c, {})]
+    todo = [(c, t) for c, ts in configs.items() for t in ts if t.task_id not in runs.get(c, {})]
     n_total = sum(len(ts) for ts in configs.values())
-    print(f"总规模 {n_total} 次调用 | 已有检查点 {sum(len(v) for v in runs.values())} | 待跑 {len(todo)}",
-          flush=True)
+    n_done = sum(len(v) for v in runs.values())
+    print(f"总规模 {n_total} 次调用 | 已有检查点 {n_done} | 待跑 {len(todo)}", flush=True)
 
     def work(item):
         c, t = item
@@ -86,54 +85,98 @@ def main():
         for fut in as_completed(futures):
             c, r = fut.result()
             runs.setdefault(c, {})[r.task_id] = {
-                "success": r.success, "fail_mode": r.fail_mode,
+                "success": r.success,
+                "fail_mode": r.fail_mode,
                 "prompt_tokens": r.prompt_tokens,
                 "completion_tokens": r.completion_tokens,
                 "latency_ms": round(r.latency_ms),
                 "cost_usd": round(r.real_cost_usd, 5),
-                "detail": r.detail[:120]}
+                "detail": r.detail[:120],
+            }
             done += 1
             if done % 10 == 0:
                 save_ckpt(runs)
                 spend = sum(x["cost_usd"] for v in runs.values() for x in v.values())
-                print(f"[{done}/{len(todo)}] {time.time()-t0:.0f}s 已耗 ${spend:.2f}", flush=True)
+                print(f"[{done}/{len(todo)}] {time.time() - t0:.0f}s 已耗 ${spend:.2f}", flush=True)
     save_ckpt(runs)
 
     # ---- 聚合 ----
     def agg(config):
         rs = list(runs.get(config, {}).values())
         n = max(1, len(rs))
-        return {"n": len(rs),
-                "acc": sum(r["success"] for r in rs) / n,
-                "tok": sum(r["prompt_tokens"] + r["completion_tokens"] for r in rs) / n,
-                "cost_usd": sum(r["cost_usd"] for r in rs) / n,
-                "fails": [r["fail_mode"] for r in rs if not r["success"]]}
+        return {
+            "n": len(rs),
+            "acc": sum(r["success"] for r in rs) / n,
+            "tok": sum(r["prompt_tokens"] + r["completion_tokens"] for r in rs) / n,
+            "cost_usd": sum(r["cost_usd"] for r in rs) / n,
+            "fails": [r["fail_mode"] for r in rs if not r["success"]],
+        }
 
     base = agg("baseline")
     skills_out = []
-    for name, sk in ALL_SKILLS.items():
+    for name in ALL_SKILLS:
         a = agg(f"+{name}")
         if not a["n"]:
             continue
-        skills_out.append({
-            "name": name, "n_applicable": a["n"],
-            "acc_base_on_applicable": base["acc"],
-            "acc_skill_on_applicable": a["acc"],
-            "acc_skill": a["acc"],
-            "d_acc_applicable": 0, "ci95": (0, 0),
-            "d_tokens_per_task": round(a["tok"] - base["tok"], 0),
-            "d_cost_per_task_yuan": 0, "verdict": "见JSON明细"})
+        skills_out.append(
+            {
+                "name": name,
+                "n_applicable": a["n"],
+                "acc_base_on_applicable": base["acc"],
+                "acc_skill_on_applicable": a["acc"],
+                "acc_skill": a["acc"],
+                "d_acc_applicable": 0,
+                "ci95": (0, 0),
+                "d_tokens_per_task": round(a["tok"] - base["tok"], 0),
+                "d_cost_per_task_yuan": 0,
+                "verdict": "见JSON明细",
+            }
+        )
 
     res = {
-        "baseline": {"acc": base["acc"], "avg_total_tokens": base["tok"],
-                     "avg_cost_yuan": 0, "fail_modes": {}},
+        "baseline": {
+            "acc": base["acc"],
+            "avg_total_tokens": base["tok"],
+            "avg_cost_yuan": 0,
+            "fail_modes": {},
+        },
         "skills": skills_out,
-        "configs_summary": {c: {"acc": agg(c)["acc"],
-                                "avg_total_tokens": agg(c)["tok"],
-                                "avg_cost_yuan": agg(c)["cost_usd"] * 7.2,
-                                "fail_modes": {}}
-                            for c in configs},
+        "configs_summary": {
+            c: {
+                "acc": agg(c)["acc"],
+                "avg_total_tokens": agg(c)["tok"],
+                "avg_cost_yuan": agg(c)["cost_usd"] * 7.2,
+                "fail_modes": {},
+            }
+            for c in configs
+        },
     }
+    # 运行 manifest: 评测可追溯(代码版本/模型/时间/成本) —— 复现的第一步
+    import subprocess as sp
+
+    def git_sha():
+        try:
+            return sp.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            ).stdout.strip()
+        except OSError:
+            return "unknown"
+
+    manifest = {
+        "git_sha": git_sha(),
+        "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "backend": "claude -p (GLM)",
+        "workers": WORKERS,
+        "n_calls": n_total,
+        "total_cost_usd": round(spend, 2),
+        "configs": {c: len(v) for c, v in runs.items()},
+    }
+    with open(os.path.join(OUT, "real_manifest.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=1)
+
     render_terminal(res)
     p = save(res, OUT, meta=f"真实后端 claude -p, {n_total}次调用, {WORKERS}并发")
     spend = sum(x["cost_usd"] for v in runs.values() for x in v.values())

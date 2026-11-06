@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 一键演示: Skill 消融全流程
 ==========================
@@ -7,6 +6,7 @@
 确定性后端(ScriptedAgent): 零 token 成本、可复现 —— 框架自检用;
 真实数字接 ClaudeCodeBackend(见 README)。
 """
+
 import io
 import os
 import sys
@@ -28,8 +28,7 @@ def main():
     print("SkillAudit 一键演示 —— 50 条中文办公任务 × 6 技能消融(确定性后端)")
     print("=" * 66)
     tasks = build_tasks()
-    print(f"任务集: {len(tasks)} 条 "
-          f"({','.join(sorted({t.ttype for t in tasks}))})\n")
+    print(f"任务集: {len(tasks)} 条 ({','.join(sorted({t.ttype for t in tasks}))})\n")
     res = ablation(tasks, ScriptedAgent(), ALL_SKILLS, repeats=5)
     render_terminal(res)
     p = save(res, OUT, meta="50 任务 × 5 次重复 × 8 配置, 确定性后端(ScriptedAgent)")
