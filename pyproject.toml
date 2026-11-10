@@ -7,7 +7,7 @@ dependencies = []
 
 [project.optional-dependencies]
 report = ["matplotlib"]
-dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6", "mypy>=1.10"]
+dev = ["pytest>=8", "pytest-cov>=7.1.0", "ruff>=0.6", "mypy>=1.10"]
 
 [build-system]
 requires = ["setuptools>=68"]
