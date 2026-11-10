@@ -4,3 +4,6 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 output/*.html
+
+NOTES.md
+项目详解.md
